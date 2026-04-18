@@ -1,5 +1,6 @@
-﻿import { Notice, Plugin } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
 import { DailyNoteResolver } from './dailyResolver';
+import { GlobalShortcutManager } from './globalShortcutManager';
 import { DEFAULT_SETTINGS, DailyFloatingNoteSettings, COMMAND_IDS } from './settings';
 import { DailyFloatingNoteSettingTab } from './settingsTab';
 import { FloatingWindowManager } from './windowManager';
@@ -8,6 +9,7 @@ export default class DailyFloatingNotePlugin extends Plugin {
   public settings: DailyFloatingNoteSettings = structuredClone(DEFAULT_SETTINGS);
   public dailyResolver!: DailyNoteResolver;
   private windowManager!: FloatingWindowManager;
+  private globalShortcutManager!: GlobalShortcutManager;
 
   public async onload(): Promise<void> {
     await this.loadSettings();
@@ -20,9 +22,13 @@ export default class DailyFloatingNotePlugin extends Plugin {
         await this.saveSettings();
       },
     });
+    this.globalShortcutManager = new GlobalShortcutManager('Alt+F', async () => {
+      await this.openDailyInFloatingWindow(0);
+    });
 
     this.addSettingTab(new DailyFloatingNoteSettingTab(this.app, this));
     this.registerCommands();
+    this.registerGlobalShortcut();
 
     this.registerEvent(
       this.app.workspace.on('window-close', (_workspaceWindow, closedWindow) => {
@@ -30,10 +36,11 @@ export default class DailyFloatingNotePlugin extends Plugin {
       }),
     );
 
-    new Notice('Daily Floating Note loaded.');
+    new Notice('Daily Floating Note загружен.');
   }
 
   public async onunload(): Promise<void> {
+    this.globalShortcutManager.unregister();
     await this.windowManager.persistWindowState();
     this.windowManager.destroy();
   }
@@ -63,10 +70,14 @@ export default class DailyFloatingNotePlugin extends Plugin {
     }
   }
 
+  public isGlobalShortcutRegistered(): boolean {
+    return this.globalShortcutManager?.isRegistered?.() ?? false;
+  }
+
   private registerCommands(): void {
     this.addCommand({
       id: COMMAND_IDS.OPEN_TODAY,
-      name: 'Open floating daily note for today',
+      name: 'Открыть сегодняшнюю daily note в плавающем окне',
       hotkeys: [{ modifiers: ['Alt'], key: 'f' }],
       callback: () => {
         void this.openDailyInFloatingWindow(0);
@@ -75,7 +86,7 @@ export default class DailyFloatingNotePlugin extends Plugin {
 
     this.addCommand({
       id: COMMAND_IDS.OPEN_YESTERDAY,
-      name: 'Open floating daily note for yesterday',
+      name: 'Открыть вчерашнюю daily note в плавающем окне',
       callback: () => {
         void this.openDailyInFloatingWindow(-1, true);
       },
@@ -83,7 +94,7 @@ export default class DailyFloatingNotePlugin extends Plugin {
 
     this.addCommand({
       id: COMMAND_IDS.OPEN_TOMORROW,
-      name: 'Open floating daily note for tomorrow',
+      name: 'Открыть завтрашнюю daily note в плавающем окне',
       callback: () => {
         void this.openDailyInFloatingWindow(1, true);
       },
@@ -91,20 +102,27 @@ export default class DailyFloatingNotePlugin extends Plugin {
 
     this.addCommand({
       id: COMMAND_IDS.TOGGLE_PIN,
-      name: 'Toggle always-on-top for floating daily window',
+      name: 'Переключить закрепление поверх всех для плавающего окна',
       callback: async () => {
         const pinned = await this.windowManager.togglePinned();
-        new Notice(pinned ? 'Floating daily window pinned.' : 'Floating daily window unpinned.');
+        new Notice(pinned ? 'Плавающее окно закреплено поверх всех.' : 'Плавающее окно больше не закреплено.');
       },
     });
 
     this.addCommand({
       id: COMMAND_IDS.CLOSE_WINDOW,
-      name: 'Close floating daily window',
+      name: 'Закрыть плавающее окно daily note',
       callback: async () => {
         await this.windowManager.closeWindow();
       },
     });
+  }
+
+  private registerGlobalShortcut(): void {
+    const registered = this.globalShortcutManager.register();
+    if (!registered) {
+      console.warn('[daily-floating-note] Global Alt+F shortcut is unavailable. Falling back to Obsidian hotkeys only.');
+    }
   }
 
   public async loadSettings(): Promise<void> {

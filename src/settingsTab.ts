@@ -13,10 +13,18 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
     containerEl.addClass('dfn-settings');
 
     containerEl.createEl('h2', { text: 'Daily Floating Note' });
+    containerEl.createEl('p', {
+      text: 'Ниже на экране Hotkeys вы видите список команд плагина: открыть today / yesterday / tomorrow, закрыть окно и переключить закрепление поверх всех.',
+      cls: 'dfn-settings-help',
+    });
 
     new Setting(containerEl)
       .setName('Горячая клавиша открытия')
-      .setDesc('Команда регистрируется автоматически. По умолчанию: Alt+F. Откройте настройки Hotkeys, чтобы изменить.')
+      .setDesc(
+        this.plugin.isGlobalShortcutRegistered()
+          ? 'Команда зарегистрирована в Obsidian и дополнительно продублирована как глобальный Alt+F, пока приложение запущено.'
+          : 'Команда зарегистрирована в Obsidian. По умолчанию: Alt+F. Глобальный Alt+F недоступен в текущей среде, поэтому работает только внутри Obsidian.',
+      )
       .addButton((button) => {
         button
           .setButtonText('Настроить хоткей')

@@ -1,4 +1,11 @@
-﻿.dfn-settings .dfn-source-info {
+.dfn-settings .dfn-settings-help {
+  margin: 8px 0 16px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.dfn-settings .dfn-source-info {
   margin: 8px 0 16px;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
