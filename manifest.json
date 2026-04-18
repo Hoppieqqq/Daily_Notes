@@ -1,10 +1,10 @@
 {
-  "id": "daily-floating-note",
-  "name": "Daily Floating Note",
-  "version": "1.0.0",
-  "minAppVersion": "1.4.0",
-  "description": "Open today's daily note in a floating window with optional always-on-top behavior.",
-  "author": "Hoppieqqq",
-  "authorUrl": "https://github.com/Hoppieqqq",
-  "isDesktopOnly": true
+    "id":  "daily-floating-note",
+    "name":  "Daily Floating Note",
+    "version":  "1.0.1",
+    "minAppVersion":  "1.4.0",
+    "description":  "Open today\u0027s daily note in a floating window with optional always-on-top behavior.",
+    "author":  "Hoppieqqq",
+    "authorUrl":  "https://github.com/Hoppieqqq",
+    "isDesktopOnly":  true
 }
