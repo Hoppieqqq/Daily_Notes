@@ -1,6 +1,15 @@
-﻿import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting } from 'obsidian';
 import DailyFloatingNotePlugin from './main';
-import { DEFAULT_SETTINGS, DailySource, RepeatHotkeyBehavior, OpenMode } from './settings';
+import { DEFAULT_SETTINGS, DailySource, OpenMode, RepeatHotkeyBehavior } from './settings';
+
+interface ObsidianSettingsApi {
+  open(): void;
+  openTabById(id: string): void;
+}
+
+type AppWithSettings = App & {
+  setting?: ObsidianSettingsApi;
+};
 
 export class DailyFloatingNoteSettingTab extends PluginSettingTab {
   constructor(app: App, private readonly plugin: DailyFloatingNotePlugin) {
@@ -12,33 +21,36 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.addClass('dfn-settings');
 
-    containerEl.createEl('h2', { text: 'Daily Floating Note' });
+    new Setting(containerEl)
+      .setName('Daily floating note')
+      .setHeading();
+
     containerEl.createEl('p', {
-      text: 'Ниже на экране Hotkeys вы видите список команд плагина: открыть today / yesterday / tomorrow, закрыть окно и переключить закрепление поверх всех.',
+      text: 'Use the Hotkeys section to assign command shortcuts for opening today, yesterday, or tomorrow, closing the floating window, and toggling always-on-top.',
       cls: 'dfn-settings-help',
     });
 
     new Setting(containerEl)
-      .setName('Горячая клавиша открытия')
+      .setName('Open hotkey settings')
       .setDesc(
         this.plugin.isGlobalShortcutRegistered()
-          ? 'Команда зарегистрирована в Obsidian и дополнительно продублирована как глобальный Alt+F, пока приложение запущено.'
-          : 'Команда зарегистрирована в Obsidian. По умолчанию: Alt+F. Глобальный Alt+F недоступен в текущей среде, поэтому работает только внутри Obsidian.',
+          ? 'A global Alt+F shortcut is active while Obsidian is running. You can also assign command shortcuts in Obsidian.'
+          : 'Command shortcuts can be assigned in Obsidian. The global Alt+F shortcut is unavailable in the current environment.',
       )
       .addButton((button) => {
         button
-          .setButtonText('Настроить хоткей')
+          .setButtonText('Open hotkeys')
           .setCta()
           .onClick(() => {
-            const anyApp = this.app as unknown as { setting?: { open: () => void; openTabById: (id: string) => void } };
-            anyApp.setting?.open?.();
-            anyApp.setting?.openTabById?.('hotkeys');
+            const appWithSettings = this.app as AppWithSettings;
+            appWithSettings.setting?.open();
+            appWithSettings.setting?.openTabById('hotkeys');
           });
       });
 
     new Setting(containerEl)
-      .setName('Закреплять окно поверх всех по умолчанию')
-      .setDesc('При открытии popout-окна включать always-on-top.')
+      .setName('Pin window on top by default')
+      .setDesc('Enable always-on-top when the floating window opens.')
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.pinByDefault)
@@ -49,8 +61,8 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Запоминать состояние закрепления между сессиями')
-      .setDesc('Сохраняет последнее состояние "поверх всех" и применяет при следующем запуске.')
+      .setName('Remember pin state between sessions')
+      .setDesc('Restore the last always-on-top state when the plugin opens the window again.')
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.rememberPinState)
@@ -61,8 +73,8 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Запоминать размер и позицию окна')
-      .setDesc('При повторном открытии popout используется последнее положение и размер.')
+      .setName('Remember window size and position')
+      .setDesc('Restore the last floating window bounds when it opens again.')
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.rememberWindowBounds)
@@ -73,13 +85,13 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Источник daily notes')
-      .setDesc('Core Daily Notes / Periodic Notes / собственные настройки плагина.')
+      .setName('Daily note source')
+      .setDesc('Choose between the Daily Notes core plugin, Periodic Notes, or this plugin’s own settings.')
       .addDropdown((dropdown) => {
         dropdown
-          .addOption('core-daily-notes', 'Core Daily Notes plugin')
-          .addOption('periodic-notes', 'Periodic Notes plugin')
-          .addOption('plugin-custom', 'Собственные настройки плагина')
+          .addOption('core-daily-notes', 'Use Daily Notes core plugin')
+          .addOption('periodic-notes', 'Use Periodic Notes plugin')
+          .addOption('plugin-custom', 'Use plugin settings')
           .setValue(this.plugin.settings.dailySource)
           .onChange(async (value) => {
             this.plugin.settings.dailySource = value as DailySource;
@@ -92,17 +104,17 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
     const sourceAvailable = this.plugin.dailyResolver.isSourceAvailable(this.plugin.settings.dailySource);
     sourceInfo.setText(
       sourceAvailable
-        ? 'Источник доступен.'
-        : 'Выбранный источник недоступен, плагин автоматически использует собственные настройки.',
+        ? 'The selected source is available.'
+        : 'The selected source is unavailable, so the plugin will use its own settings.',
     );
 
     if (this.plugin.settings.dailySource === 'plugin-custom') {
       new Setting(containerEl)
-        .setName('Папка daily notes')
-        .setDesc('Относительный путь внутри vault.')
+        .setName('Daily notes folder')
+        .setDesc('Use a path relative to the vault root.')
         .addText((text) =>
           text
-            .setPlaceholder('Daily')
+            .setPlaceholder('daily')
             .setValue(this.plugin.settings.customFolder)
             .onChange(async (value) => {
               this.plugin.settings.customFolder = value;
@@ -111,11 +123,11 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName('Формат имени файла')
-        .setDesc('Формат даты через moment.js, например YYYY-MM-DD.')
+        .setName('Daily note filename format')
+        .setDesc('Use a moment.js date pattern, for example yyyy-mm-dd.')
         .addText((text) =>
           text
-            .setPlaceholder('YYYY-MM-DD')
+            .setPlaceholder('yyyy-mm-dd')
             .setValue(this.plugin.settings.customDateFormat)
             .onChange(async (value) => {
               this.plugin.settings.customDateFormat = value;
@@ -124,11 +136,11 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName('Путь к шаблону')
-        .setDesc('Опциональный markdown-шаблон для создания новой daily note.')
+        .setName('Template file path')
+        .setDesc('Use an optional Markdown template when the plugin creates a new daily note.')
         .addText((text) =>
           text
-            .setPlaceholder('Templates/Daily.md')
+            .setPlaceholder('templates/daily.md')
             .setValue(this.plugin.settings.customTemplatePath)
             .onChange(async (value) => {
               this.plugin.settings.customTemplatePath = value;
@@ -138,13 +150,13 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
     }
 
     new Setting(containerEl)
-      .setName('Поведение при повторном нажатии хоткея')
-      .setDesc('Что делать, если floating-окно уже открыто.')
+      .setName('Repeat hotkey behavior')
+      .setDesc('Choose what happens when the floating window is already open.')
       .addDropdown((dropdown) =>
         dropdown
-          .addOption('focus', 'Фокусировать существующее окно')
-          .addOption('toggle-visibility', 'Скрыть / показать окно')
-          .addOption('reopen', 'Переоткрыть окно')
+          .addOption('focus', 'Focus the existing window')
+          .addOption('toggle-visibility', 'Hide or show the existing window')
+          .addOption('reopen', 'Reopen the floating window')
           .setValue(this.plugin.settings.repeatHotkeyBehavior)
           .onChange(async (value) => {
             this.plugin.settings.repeatHotkeyBehavior = value as RepeatHotkeyBehavior;
@@ -153,12 +165,12 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Режим открытия заметки')
-      .setDesc('Редактирование (source) или чтение (preview).')
+      .setName('Open note mode')
+      .setDesc('Choose whether the note opens in editing mode or reading mode.')
       .addDropdown((dropdown) =>
         dropdown
-          .addOption('editing', 'Редактирование')
-          .addOption('reading', 'Чтение')
+          .addOption('editing', 'Editing mode')
+          .addOption('reading', 'Reading mode')
           .setValue(this.plugin.settings.openMode)
           .onChange(async (value) => {
             this.plugin.settings.openMode = value as OpenMode;
@@ -167,21 +179,21 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Открыть daily сейчас')
-      .setDesc('Тестовый запуск открытия плавающей daily note.')
+      .setName('Open today’s daily note now')
+      .setDesc('Run a quick test and open the floating window immediately.')
       .addButton((button) => {
-        button.setButtonText('Открыть').setCta().onClick(async () => {
+        button.setButtonText('Open now').setCta().onClick(async () => {
           await this.plugin.openDailyInFloatingWindow(0, true);
         });
       });
 
     new Setting(containerEl)
-      .setName('Сбросить настройки')
-      .setDesc('Вернуть все параметры к значениям по умолчанию.')
+      .setName('Reset plugin settings')
+      .setDesc('Restore all plugin settings to their default values.')
       .addButton((button) => {
         button
           .setWarning()
-          .setButtonText('Сбросить')
+          .setButtonText('Reset settings')
           .onClick(async () => {
             this.plugin.settings = structuredClone(DEFAULT_SETTINGS);
             await this.plugin.saveSettings();

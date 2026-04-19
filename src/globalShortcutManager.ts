@@ -1,7 +1,30 @@
 type ShortcutCallback = () => void | Promise<void>;
 
+interface ElectronGlobalShortcut {
+  register(accelerator: string, callback: () => void): boolean;
+  unregister(accelerator: string): void;
+  isRegistered(accelerator: string): boolean;
+}
+
+interface ElectronRemoteModuleLike {
+  require?: (module: string) => unknown;
+}
+
+interface ElectronModuleLike {
+  globalShortcut?: ElectronGlobalShortcut;
+  remote?: {
+    globalShortcut?: ElectronGlobalShortcut;
+  };
+}
+
+type RequireFunction = (module: string) => unknown;
+
+type WindowWithRequire = Window & {
+  require?: RequireFunction;
+};
+
 export class GlobalShortcutManager {
-  private globalShortcut: any | null = null;
+  private globalShortcut: ElectronGlobalShortcut | null = null;
   private readonly accelerator: string;
   private registered = false;
 
@@ -11,7 +34,7 @@ export class GlobalShortcutManager {
 
   public register(): boolean {
     const globalShortcut = this.resolveGlobalShortcut();
-    if (!globalShortcut?.register) {
+    if (!globalShortcut) {
       this.unregister();
       return false;
     }
@@ -36,7 +59,7 @@ export class GlobalShortcutManager {
   }
 
   public unregister(): void {
-    if (!this.globalShortcut?.unregister) {
+    if (!this.globalShortcut) {
       this.globalShortcut = null;
       this.registered = false;
       return;
@@ -53,7 +76,7 @@ export class GlobalShortcutManager {
   }
 
   public isRegistered(): boolean {
-    if (this.globalShortcut?.isRegistered) {
+    if (this.globalShortcut) {
       try {
         return Boolean(this.globalShortcut.isRegistered(this.accelerator));
       } catch {
@@ -63,31 +86,41 @@ export class GlobalShortcutManager {
     return this.registered;
   }
 
-  private resolveGlobalShortcut(): any | null {
-    const globalWindow = window as Window & { require?: (module: string) => any };
+  private resolveGlobalShortcut(): ElectronGlobalShortcut | null {
+    const globalWindow = window as WindowWithRequire;
     if (typeof globalWindow.require !== 'function') {
       return null;
     }
 
     try {
-      const remote = globalWindow.require('@electron/remote');
-      const electronMain = remote?.require?.('electron');
-      if (electronMain?.globalShortcut) {
-        return electronMain.globalShortcut;
+      const remoteModule = globalWindow.require('@electron/remote');
+      if (this.isElectronRemoteModule(remoteModule)) {
+        const electronMain = remoteModule.require?.('electron');
+        if (this.isElectronModule(electronMain) && electronMain.globalShortcut) {
+          return electronMain.globalShortcut;
+        }
       }
     } catch {
       // Fall through to legacy remote.
     }
 
     try {
-      const electron = globalWindow.require('electron');
-      if (electron?.remote?.globalShortcut) {
-        return electron.remote.globalShortcut;
+      const electronModule = globalWindow.require('electron');
+      if (this.isElectronModule(electronModule) && electronModule.remote?.globalShortcut) {
+        return electronModule.remote.globalShortcut;
       }
     } catch {
       return null;
     }
 
     return null;
+  }
+
+  private isElectronRemoteModule(value: unknown): value is ElectronRemoteModuleLike {
+    return typeof value === 'object' && value !== null;
+  }
+
+  private isElectronModule(value: unknown): value is ElectronModuleLike {
+    return typeof value === 'object' && value !== null;
   }
 }

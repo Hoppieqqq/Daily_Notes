@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2 - 2026-04-19
+
+- Removed the default Obsidian hotkey from the command registration to avoid conflicts with user shortcuts.
+- Reworked plugin initialization and unload flow to satisfy Obsidian plugin API expectations.
+- Replaced loose `any` usage with explicit bridge and plugin interfaces across the resolver, window manager, and global shortcut code.
+- Normalized settings and command labels to sentence case for Community Plugin review.
+- Updated the plugin CI and release workflows to use Node 24.
+
 ## 1.0.1 - 2026-04-18
 
 - Added a global Alt+F shortcut path through Electron so today's floating daily note can open even when Obsidian is not focused but still running.

@@ -1,4 +1,4 @@
-﻿import { App, Notice, TAbstractFile, TFile, moment, normalizePath } from 'obsidian';
+import { App, Notice, TAbstractFile, TFile, moment, normalizePath } from 'obsidian';
 import { DailyFloatingNoteSettings, DailySource } from './settings';
 
 export interface DailyConfig {
@@ -7,6 +7,52 @@ export interface DailyConfig {
   templatePath: string;
   sourceLabel: string;
 }
+
+interface DailySourceOptions {
+  folder?: unknown;
+  format?: unknown;
+  dateFormat?: unknown;
+  template?: unknown;
+  templateFile?: unknown;
+  templatePath?: unknown;
+}
+
+interface DailyNotesPluginInstance {
+  options?: DailySourceOptions;
+  settings?: DailySourceOptions;
+}
+
+interface DailyNotesPluginLike {
+  _loaded?: boolean;
+  enabled?: boolean;
+  options?: DailySourceOptions;
+  instance?: DailyNotesPluginInstance;
+}
+
+interface InternalPluginsApi {
+  getPluginById?: (id: string) => DailyNotesPluginLike | undefined;
+  plugins?: Record<string, DailyNotesPluginLike | undefined>;
+  getEnabledPlugins?: () => Set<string> | undefined;
+}
+
+interface PeriodicNotesPluginLike {
+  settings?: { daily?: DailySourceOptions };
+  options?: { daily?: DailySourceOptions };
+}
+
+interface AppWithDailyPluginInternals extends App {
+  internalPlugins?: InternalPluginsApi;
+  plugins?: {
+    plugins?: Record<string, PeriodicNotesPluginLike | undefined>;
+  };
+}
+
+interface ObsidianMoment {
+  add(amount: number, unit: string): ObsidianMoment;
+  format(pattern: string): string;
+}
+
+const DEFAULT_DATE_FORMAT = 'YYYY-MM-DD';
 
 export class DailyNoteResolver {
   constructor(private readonly app: App) {}
@@ -30,7 +76,7 @@ export class DailyNoteResolver {
 
     await this.ensureFolder(config.folder);
     const content = await this.readTemplateContent(config.templatePath, targetDate);
-    return await this.app.vault.create(path, content);
+    return this.app.vault.create(path, content);
   }
 
   public resolveDailyConfig(settings: DailyFloatingNoteSettings): DailyConfig {
@@ -40,125 +86,15 @@ export class DailyNoteResolver {
     }
 
     if (settings.dailySource !== 'plugin-custom') {
-      new Notice('Источник daily недоступен, используется локальная конфигурация плагина.');
+      new Notice('The selected daily note source is unavailable, so plugin settings will be used.');
     }
 
     return {
       folder: settings.customFolder.trim(),
-      dateFormat: settings.customDateFormat.trim() || 'YYYY-MM-DD',
+      dateFormat: settings.customDateFormat.trim() || DEFAULT_DATE_FORMAT,
       templatePath: settings.customTemplatePath.trim(),
-      sourceLabel: 'Plugin custom settings',
+      sourceLabel: 'Plugin settings',
     };
-  }
-
-  private getConfigFromSource(source: DailySource): DailyConfig | null {
-    if (source === 'plugin-custom') {
-      return null;
-    }
-
-    if (source === 'core-daily-notes') {
-      const core = this.getCoreDailySettings();
-      if (core) {
-        return {
-          folder: core.folder,
-          dateFormat: core.format,
-          templatePath: core.template,
-          sourceLabel: 'Core Daily Notes',
-        };
-      }
-      return null;
-    }
-
-    if (source === 'periodic-notes') {
-      const periodic = this.getPeriodicDailySettings();
-      if (periodic) {
-        return {
-          folder: periodic.folder,
-          dateFormat: periodic.format,
-          templatePath: periodic.template,
-          sourceLabel: 'Periodic Notes',
-        };
-      }
-      return null;
-    }
-
-    return null;
-  }
-
-  private getCoreDailySettings(): { folder: string; format: string; template: string } | null {
-    const internalPlugins = (this.app as unknown as { internalPlugins?: any }).internalPlugins;
-    const plugin = internalPlugins?.getPluginById?.('daily-notes') ?? internalPlugins?.plugins?.['daily-notes'];
-    const enabled = internalPlugins?.getEnabledPlugins?.()?.has?.('daily-notes') ?? plugin?._loaded ?? plugin?.enabled;
-
-    if (!enabled || !plugin) {
-      return null;
-    }
-
-    const options = plugin.instance?.options ?? plugin.instance?.settings ?? plugin.options ?? null;
-    if (!options) {
-      return null;
-    }
-
-    return {
-      folder: String(options.folder ?? '').trim(),
-      format: String(options.format ?? options.dateFormat ?? 'YYYY-MM-DD').trim(),
-      template: String(options.template ?? options.templateFile ?? '').trim(),
-    };
-  }
-
-  private getPeriodicDailySettings(): { folder: string; format: string; template: string } | null {
-    const periodicPlugin = (this.app as unknown as { plugins?: { plugins?: Record<string, any> } }).plugins?.plugins?.['periodic-notes'];
-    if (!periodicPlugin) {
-      return null;
-    }
-
-    const settings = periodicPlugin.settings?.daily ?? periodicPlugin.options?.daily ?? null;
-    if (!settings) {
-      return null;
-    }
-
-    return {
-      folder: String(settings.folder ?? '').trim(),
-      format: String(settings.format ?? settings.dateFormat ?? 'YYYY-MM-DD').trim(),
-      template: String(settings.template ?? settings.templatePath ?? '').trim(),
-    };
-  }
-
-  private async ensureFolder(folderPath: string): Promise<void> {
-    const normalized = normalizePath(folderPath.trim());
-    if (!normalized) {
-      return;
-    }
-
-    const segments = normalized.split('/').filter(Boolean);
-    let current = '';
-    for (const segment of segments) {
-      current = current ? `${current}/${segment}` : segment;
-      const existing = this.app.vault.getAbstractFileByPath(current);
-      if (!existing) {
-        await this.app.vault.createFolder(current);
-      }
-    }
-  }
-
-  private async readTemplateContent(templatePath: string, date: any): Promise<string> {
-    if (!templatePath.trim()) {
-      return '';
-    }
-
-    const file = this.app.vault.getAbstractFileByPath(normalizePath(templatePath.trim()));
-    if (!(file instanceof TFile)) {
-      return '';
-    }
-
-    const raw = await this.app.vault.read(file);
-    return raw
-      .replaceAll('{{date}}', date.format('YYYY-MM-DD'))
-      .replaceAll('{{time}}', date.format('HH:mm'));
-  }
-
-  private getMoment(input?: Date | string): any {
-    return (moment as unknown as (value?: Date | string) => any)(input);
   }
 
   public isSourceAvailable(source: DailySource): boolean {
@@ -181,5 +117,119 @@ export class DailyNoteResolver {
     }
     const file: TAbstractFile | null = this.app.vault.getAbstractFileByPath(normalizePath(config.templatePath));
     return file instanceof TFile ? file : null;
+  }
+
+  private getConfigFromSource(source: DailySource): DailyConfig | null {
+    if (source === 'plugin-custom') {
+      return null;
+    }
+
+    if (source === 'core-daily-notes') {
+      const core = this.getCoreDailySettings();
+      return core
+        ? {
+            folder: core.folder,
+            dateFormat: core.format,
+            templatePath: core.template,
+            sourceLabel: 'Daily Notes core plugin',
+          }
+        : null;
+    }
+
+    if (source === 'periodic-notes') {
+      const periodic = this.getPeriodicDailySettings();
+      return periodic
+        ? {
+            folder: periodic.folder,
+            dateFormat: periodic.format,
+            templatePath: periodic.template,
+            sourceLabel: 'Periodic Notes plugin',
+          }
+        : null;
+    }
+
+    return null;
+  }
+
+  private getCoreDailySettings(): { folder: string; format: string; template: string } | null {
+    const internalPlugins = (this.app as AppWithDailyPluginInternals).internalPlugins;
+    const plugin = internalPlugins?.getPluginById?.('daily-notes') ?? internalPlugins?.plugins?.['daily-notes'];
+    const enabledPlugins = internalPlugins?.getEnabledPlugins?.();
+    const enabled = enabledPlugins?.has('daily-notes') ?? plugin?._loaded ?? plugin?.enabled;
+
+    if (!enabled || !plugin) {
+      return null;
+    }
+
+    const options = plugin.instance?.options ?? plugin.instance?.settings ?? plugin.options ?? null;
+    if (!options) {
+      return null;
+    }
+
+    return this.normalizeDailySourceOptions(options);
+  }
+
+  private getPeriodicDailySettings(): { folder: string; format: string; template: string } | null {
+    const periodicPlugin = (this.app as AppWithDailyPluginInternals).plugins?.plugins?.['periodic-notes'];
+    if (!periodicPlugin) {
+      return null;
+    }
+
+    const settings = periodicPlugin.settings?.daily ?? periodicPlugin.options?.daily ?? null;
+    if (!settings) {
+      return null;
+    }
+
+    return this.normalizeDailySourceOptions(settings);
+  }
+
+  private normalizeDailySourceOptions(options: DailySourceOptions): { folder: string; format: string; template: string } {
+    return {
+      folder: this.readString(options.folder),
+      format: this.readString(options.format) || this.readString(options.dateFormat) || DEFAULT_DATE_FORMAT,
+      template: this.readString(options.template) || this.readString(options.templateFile) || this.readString(options.templatePath),
+    };
+  }
+
+  private readString(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private async ensureFolder(folderPath: string): Promise<void> {
+    const normalized = normalizePath(folderPath.trim());
+    if (!normalized) {
+      return;
+    }
+
+    const segments = normalized.split('/').filter(Boolean);
+    let current = '';
+    for (const segment of segments) {
+      current = current ? `${current}/${segment}` : segment;
+      const existing = this.app.vault.getAbstractFileByPath(current);
+      if (!existing) {
+        await this.app.vault.createFolder(current);
+      }
+    }
+  }
+
+  private async readTemplateContent(templatePath: string, date: ObsidianMoment): Promise<string> {
+    if (!templatePath.trim()) {
+      return '';
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(normalizePath(templatePath.trim()));
+    if (!(file instanceof TFile)) {
+      return '';
+    }
+
+    const raw = await this.app.vault.read(file);
+    return raw
+      .replaceAll('{{date}}', date.format(DEFAULT_DATE_FORMAT))
+      .replaceAll('{{time}}', date.format('HH:mm'));
+  }
+
+  private getMoment(input?: Date | string): ObsidianMoment {
+    const createMoment = moment as unknown as (value?: Date | string) => ObsidianMoment;
+    return createMoment(input);
   }
 }

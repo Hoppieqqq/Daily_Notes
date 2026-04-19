@@ -1,4 +1,4 @@
-﻿import { App, Notice, TFile, WorkspaceLeaf, WorkspaceWindow } from 'obsidian';
+import { App, Notice, TFile, WorkspaceLeaf, WorkspaceWindow } from 'obsidian';
 import { DailyFloatingNoteSettings, OpenMode } from './settings';
 
 interface FloatingWindowPersistence {
@@ -6,10 +6,56 @@ interface FloatingWindowPersistence {
   saveSettingsPatch: (patch: Partial<DailyFloatingNoteSettings>) => Promise<void>;
 }
 
+interface BrowserWindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface BrowserWindowLike {
+  isMinimized?: () => boolean;
+  restore?: () => void;
+  show?: () => void;
+  focus?: () => void;
+  minimize?: () => void;
+  isAlwaysOnTop?: () => boolean;
+  setAlwaysOnTop?: (flag: boolean, level?: string) => void;
+  getBounds?: () => BrowserWindowBounds;
+  on?: (event: 'resize' | 'move', handler: () => void) => void;
+  removeListener?: (event: 'resize' | 'move', handler: () => void) => void;
+}
+
+interface ElectronRemoteLike {
+  getCurrentWindow?: () => BrowserWindowLike;
+  require?: (module: string) => unknown;
+}
+
+interface ElectronModuleLike {
+  remote?: {
+    getCurrentWindow?: () => BrowserWindowLike;
+  };
+}
+
+type WindowWithRequire = Window & {
+  require?: (module: string) => unknown;
+};
+
+type WorkspaceNodeLike = {
+  parent?: WorkspaceNodeLike | null;
+  win?: Window;
+  doc?: Document;
+};
+
+type MarkdownViewState = {
+  file?: string;
+  mode?: 'source' | 'preview';
+};
+
 export class FloatingWindowManager {
   private leaf: WorkspaceLeaf | null = null;
   private workspaceWindow: WorkspaceWindow | null = null;
-  private browserWindow: any | null = null;
+  private browserWindow: BrowserWindowLike | null = null;
   private geometrySaveTimer: number | null = null;
   private geometryHandler: (() => void) | null = null;
 
@@ -24,7 +70,8 @@ export class FloatingWindowManager {
 
   public getCurrentFilePath(): string | null {
     const state = this.leaf?.getViewState();
-    const filePath = (state?.state as Record<string, unknown> | undefined)?.file;
+    const markdownState = state?.state as MarkdownViewState | undefined;
+    const filePath = markdownState?.file;
     return typeof filePath === 'string' ? filePath : null;
   }
 
@@ -46,7 +93,7 @@ export class FloatingWindowManager {
       ? settings.lastPinState
       : settings.pinByDefault;
     await this.setPinned(shouldPin, false);
-    this.focusWindow();
+    await this.focusWindow();
   }
 
   public async focusWindow(): Promise<void> {
@@ -59,7 +106,7 @@ export class FloatingWindowManager {
         this.browserWindow.focus?.();
         return;
       } catch {
-        // Fallback to workspace reveal.
+        // Fall back to workspace reveal.
       }
     }
 
@@ -117,7 +164,7 @@ export class FloatingWindowManager {
 
   public async togglePinned(): Promise<boolean> {
     if (!this.browserWindow) {
-      new Notice('Не удалось переключить закрепление: окно не поддерживает Electron bridge.');
+      new Notice('Could not change pin state because the Electron bridge is unavailable.');
       return false;
     }
 
@@ -138,7 +185,7 @@ export class FloatingWindowManager {
         await this.persistence.saveSettingsPatch({ lastPinState: flag });
       }
     } catch {
-      new Notice('Не удалось изменить режим always-on-top на этой платформе.');
+      new Notice('Could not change the always-on-top state on this platform.');
     }
   }
 
@@ -206,8 +253,9 @@ export class FloatingWindowManager {
     }
 
     const state = this.leaf.getViewState();
-    const markdownState = state.state as Record<string, unknown>;
+    const markdownState = (state.state as MarkdownViewState | undefined) ?? {};
     markdownState.mode = mode === 'editing' ? 'source' : 'preview';
+    state.state = markdownState;
     await this.leaf.setViewState(state, { focus: true });
   }
 
@@ -216,49 +264,48 @@ export class FloatingWindowManager {
   }
 
   private findWorkspaceWindow(leaf: WorkspaceLeaf): WorkspaceWindow | null {
-    let node: any = leaf;
+    let node: WorkspaceNodeLike | WorkspaceWindow | null = leaf;
     while (node) {
       if (node instanceof WorkspaceWindow) {
         return node;
       }
-      if (node.win && node.doc) {
-        return node as WorkspaceWindow;
+      if (this.isWorkspaceWindowLike(node)) {
+        return node;
       }
-      node = node.parent;
+      node = node.parent ?? null;
     }
     return null;
   }
 
-  private resolveBrowserWindow(domWindow: Window | null): any | null {
+  private resolveBrowserWindow(domWindow: Window | null): BrowserWindowLike | null {
     if (!domWindow) {
       return null;
     }
 
-    const winAny = domWindow as any;
-    try {
-      const req = winAny.require;
-      if (!req) {
-        return null;
-      }
-
-      try {
-        const remote = req('@electron/remote');
-        if (remote?.getCurrentWindow) {
-          return remote.getCurrentWindow();
-        }
-      } catch {
-        // Continue fallback.
-      }
-
-      const electron = req('electron');
-      if (electron?.remote?.getCurrentWindow) {
-        return electron.remote.getCurrentWindow();
-      }
-
+    const requireFunction = (domWindow as WindowWithRequire).require;
+    if (!requireFunction) {
       return null;
+    }
+
+    try {
+      const remoteModule = requireFunction('@electron/remote');
+      if (this.isElectronRemoteModule(remoteModule) && remoteModule.getCurrentWindow) {
+        return remoteModule.getCurrentWindow();
+      }
+    } catch {
+      // Continue with the legacy fallback.
+    }
+
+    try {
+      const electronModule = requireFunction('electron');
+      if (this.isElectronModule(electronModule) && electronModule.remote?.getCurrentWindow) {
+        return electronModule.remote.getCurrentWindow();
+      }
     } catch {
       return null;
     }
+
+    return null;
   }
 
   private attachGeometryListeners(): void {
@@ -295,5 +342,17 @@ export class FloatingWindowManager {
     }
 
     this.geometryHandler = null;
+  }
+
+  private isElectronRemoteModule(value: unknown): value is ElectronRemoteLike {
+    return typeof value === 'object' && value !== null;
+  }
+
+  private isElectronModule(value: unknown): value is ElectronModuleLike {
+    return typeof value === 'object' && value !== null;
+  }
+
+  private isWorkspaceWindowLike(value: WorkspaceNodeLike | WorkspaceWindow): value is WorkspaceWindow {
+    return 'win' in value && 'doc' in value && value.win instanceof Window && value.doc instanceof Document;
   }
 }
