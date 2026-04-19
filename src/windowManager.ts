@@ -164,7 +164,7 @@ export class FloatingWindowManager {
 
   public async togglePinned(): Promise<boolean> {
     if (!this.browserWindow) {
-      new Notice('Could not change pin state because the Electron bridge is unavailable.');
+      new Notice('Could not change the pin state because the app window bridge is unavailable.');
       return false;
     }
 
@@ -356,3 +356,4 @@ export class FloatingWindowManager {
     return 'win' in value && 'doc' in value && value.win instanceof Window && value.doc instanceof Document;
   }
 }
+

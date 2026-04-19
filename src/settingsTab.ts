@@ -22,11 +22,11 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
     containerEl.addClass('dfn-settings');
 
     new Setting(containerEl)
-      .setName('Daily floating note')
+      .setName('General')
       .setHeading();
 
     containerEl.createEl('p', {
-      text: 'Use the Hotkeys section to assign command shortcuts for opening today, yesterday, or tomorrow, closing the floating window, and toggling always-on-top.',
+      text: 'Use the hotkeys section to assign command shortcuts for opening today, yesterday, or tomorrow, closing the floating window, and toggling always on top.',
       cls: 'dfn-settings-help',
     });
 
@@ -86,11 +86,11 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Daily note source')
-      .setDesc('Choose between the Daily Notes core plugin, Periodic Notes, or this plugin’s own settings.')
+      .setDesc("Choose between the 'Daily Notes' core plugin, the 'Periodic Notes' plugin, or this plugin's own settings.")
       .addDropdown((dropdown) => {
         dropdown
-          .addOption('core-daily-notes', 'Use Daily Notes core plugin')
-          .addOption('periodic-notes', 'Use Periodic Notes plugin')
+          .addOption('core-daily-notes', "Use the 'Daily Notes' core plugin")
+          .addOption('periodic-notes', "Use the 'Periodic Notes' plugin")
           .addOption('plugin-custom', 'Use plugin settings')
           .setValue(this.plugin.settings.dailySource)
           .onChange(async (value) => {
@@ -114,7 +114,7 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
         .setDesc('Use a path relative to the vault root.')
         .addText((text) =>
           text
-            .setPlaceholder('daily')
+            .setPlaceholder('Daily')
             .setValue(this.plugin.settings.customFolder)
             .onChange(async (value) => {
               this.plugin.settings.customFolder = value;
@@ -127,7 +127,7 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
         .setDesc('Use a moment.js date pattern, for example yyyy-mm-dd.')
         .addText((text) =>
           text
-            .setPlaceholder('yyyy-mm-dd')
+            .setPlaceholder('YYYY-MM-DD')
             .setValue(this.plugin.settings.customDateFormat)
             .onChange(async (value) => {
               this.plugin.settings.customDateFormat = value;
@@ -179,7 +179,7 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Open today’s daily note now')
+      .setName("Open today's daily note now")
       .setDesc('Run a quick test and open the floating window immediately.')
       .addButton((button) => {
         button.setButtonText('Open now').setCta().onClick(async () => {
@@ -202,3 +202,4 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
       });
   }
 }
+

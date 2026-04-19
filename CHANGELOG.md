@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3 - 2026-04-19
+
+- Removed the plugin name from the settings heading to match Obsidian Community Plugin review guidance.
+- Normalized the remaining settings and notice strings to sentence case.
+- Fixed legacy mojibake in settings copy and refreshed the built plugin bundle.
+
 ## 1.0.2 - 2026-04-19
 
 - Removed the default Obsidian hotkey from the command registration to avoid conflicts with user shortcuts.
