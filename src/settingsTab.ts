@@ -123,7 +123,7 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
         .setDesc('Use a moment.js date pattern, for example yyyy-mm-dd.')
         .addText((text) =>
           text
-            .setPlaceholder('yyyy-mm-dd')
+            .setPlaceholder('For example: yyyy-mm-dd')
             .setValue(this.plugin.settings.customDateFormat)
             .onChange(async (value) => {
               this.plugin.settings.customDateFormat = value;

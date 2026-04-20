@@ -1,6 +1,6 @@
 {
     "name": "daily-floating-note",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "description": "Obsidian plugin that opens today's daily note in a floating always-on-top window.",
     "main": "main.js",
     "scripts": {

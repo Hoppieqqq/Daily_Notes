@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.5 - 2026-04-20
+
+- Replaced the filename format placeholder with sentence-case helper text to satisfy the final automated UI text review check.
+
 ## 1.0.4 - 2026-04-20
 
 - Removed the initial settings heading entirely to match Obsidian guidance for general settings.
