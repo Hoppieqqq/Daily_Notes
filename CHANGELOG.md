@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4 - 2026-04-20
+
+- Removed the initial settings heading entirely to match Obsidian guidance for general settings.
+- Lowercased the remaining source selector strings and date-format placeholder to satisfy the automated sentence-case review checks.
+
 ## 1.0.3 - 2026-04-19
 
 - Removed the plugin name from the settings heading to match Obsidian Community Plugin review guidance.

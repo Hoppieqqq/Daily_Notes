@@ -21,10 +21,6 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.addClass('dfn-settings');
 
-    new Setting(containerEl)
-      .setName('General')
-      .setHeading();
-
     containerEl.createEl('p', {
       text: 'Use the hotkeys section to assign command shortcuts for opening today, yesterday, or tomorrow, closing the floating window, and toggling always on top.',
       cls: 'dfn-settings-help',
@@ -86,11 +82,11 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Daily note source')
-      .setDesc("Choose between the 'Daily Notes' core plugin, the 'Periodic Notes' plugin, or this plugin's own settings.")
+      .setDesc("Choose between the core daily notes plugin, the periodic notes plugin, or this plugin's own settings.")
       .addDropdown((dropdown) => {
         dropdown
-          .addOption('core-daily-notes', "Use the 'Daily Notes' core plugin")
-          .addOption('periodic-notes', "Use the 'Periodic Notes' plugin")
+          .addOption('core-daily-notes', 'Use the core daily notes plugin')
+          .addOption('periodic-notes', 'Use the periodic notes plugin')
           .addOption('plugin-custom', 'Use plugin settings')
           .setValue(this.plugin.settings.dailySource)
           .onChange(async (value) => {
@@ -127,7 +123,7 @@ export class DailyFloatingNoteSettingTab extends PluginSettingTab {
         .setDesc('Use a moment.js date pattern, for example yyyy-mm-dd.')
         .addText((text) =>
           text
-            .setPlaceholder('YYYY-MM-DD')
+            .setPlaceholder('yyyy-mm-dd')
             .setValue(this.plugin.settings.customDateFormat)
             .onChange(async (value) => {
               this.plugin.settings.customDateFormat = value;
